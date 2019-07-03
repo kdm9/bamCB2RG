@@ -14,20 +14,19 @@ def main():
     args = ap.parse_args()
 
     newrgs = {}
+    rgsmlist = set()
     with pysam.AlignmentFile(args.input_bam) as bam:
-        for aln in bam:
-            rgid = aln.get_tag('RG') + "_" + aln.get_tag('CB')
-            newrgs[rgid] = aln.get_tag('RG')
         oldrgs = {d["ID"]: d for d in bam.header["RG"]}
-
+        for aln in bam:
+            rgdata = oldrgs[aln.get_tag('RG')].copy()
+            rgid = aln.get_tag('RG') + "_" + aln.get_tag('CB')
+            rgsm = rgdata["SM"] + "_" + aln.get_tag('CB')
+            rgdata["ID"] = rgid
+            rgdata["SM"] = rgsm
+            newrgs[rgid] = rgdata
         newheader = bam.header.to_dict()
 
-    rgsmlist = []
-    for newrg, oldrg in sorted(newrgs.items()):
-        rgdata = oldrgs[oldrg].copy()
-        rgdata.update({"ID":newrg, "SM":newrg})
-        rgsmlist.append(rgdata)
-    newheader["RG"] = rgsmlist
+    newheader["RG"] = [d for rid, d in sorted(newrgs.items())]
 
     with pysam.AlignmentFile(args.input_bam) as bam, \
         pysam.AlignmentFile(args.output_bam, "wb", header=newheader) as out:
